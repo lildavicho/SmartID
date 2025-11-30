@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { SISConnector, SyncResult, SendResult } from '../interfaces/sis-connector.interface';
 import { IntegrationMapping } from '../entities/integration-mapping.entity';
 
@@ -8,11 +9,12 @@ import { IntegrationMapping } from '../entities/integration-mapping.entity';
  * that don't have a direct API integration.
  */
 export class GenericCsvConnector implements SISConnector {
-  private config: any;
-  private credentials: any;
+  private readonly logger = new Logger(GenericCsvConnector.name);
+  private config: Record<string, unknown>;
+  private credentials: Record<string, unknown>;
   private connected: boolean = false;
 
-  async connect(config: any, credentials: any): Promise<boolean> {
+  async connect(config: Record<string, unknown>, credentials: Record<string, unknown>): Promise<boolean> {
     this.config = config;
     this.credentials = credentials;
 
@@ -53,7 +55,7 @@ export class GenericCsvConnector implements SISConnector {
     const mappings: IntegrationMapping[] = [];
     const errors: string[] = [];
 
-    console.log(`Importing students from CSV for institution ${institutionId}`);
+    this.logger.log(`Importing students from CSV for institution ${institutionId}`);
 
     return {
       success: true,
@@ -74,7 +76,7 @@ export class GenericCsvConnector implements SISConnector {
     const mappings: IntegrationMapping[] = [];
     const errors: string[] = [];
 
-    console.log(`Importing courses from CSV for institution ${institutionId}`);
+    this.logger.log(`Importing courses from CSV for institution ${institutionId}`);
 
     return {
       success: true,
@@ -97,7 +99,7 @@ export class GenericCsvConnector implements SISConnector {
 
     const errors: string[] = [];
 
-    console.log(`Exporting attendance to CSV for session ${sessionId}`);
+    this.logger.log(`Exporting attendance to CSV for session ${sessionId}`);
 
     return {
       success: true,

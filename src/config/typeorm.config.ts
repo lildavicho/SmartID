@@ -7,6 +7,8 @@ const DATABASE_URL = process.env.DATABASE_URL ||
 
 // mask password
 const masked = DATABASE_URL.replace(/:([^:@]+)@/, ':****@')
+// Note: Using console.log here is acceptable for migration scripts
+// eslint-disable-next-line no-console
 console.log('🔌 Using DATABASE_URL:', masked)
 
 const AppDataSource = new DataSource({

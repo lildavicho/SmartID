@@ -51,7 +51,7 @@ export class AttendanceLogService {
     deviceId: string,
     institutionId: string,
     method: AttendanceMethod = AttendanceMethod.NFC,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<AttendanceLog> {
     return this.create({
       userId,
@@ -68,7 +68,7 @@ export class AttendanceLogService {
     deviceId: string,
     institutionId: string,
     method: AttendanceMethod = AttendanceMethod.NFC,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<AttendanceLog> {
     return this.create({
       userId,

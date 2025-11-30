@@ -104,7 +104,7 @@ async function bootstrap() {
 /**
  * Validar conexión a la base de datos
  */
-async function validateDatabaseConnection(app: any): Promise<void> {
+async function validateDatabaseConnection(app: { get: (token: any) => any }): Promise<void> {
   const logger = new Logger('Database');
 
   try {

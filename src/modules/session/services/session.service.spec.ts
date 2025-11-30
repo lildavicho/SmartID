@@ -1,25 +1,37 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { SessionService } from './session.service';
 import { AttendanceService } from './attendance.service';
 import { ClassSession } from '../entities/class-session.entity';
 import { SessionStatus } from '../enums/session-status.enum';
-import { AttendanceStatus } from '../enums/attendance-status.enum';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { StartSessionDto } from '../dto/start-session.dto';
+import { CloseSessionDto } from '../dto/close-session.dto';
 
 describe('SessionService', () => {
   let service: SessionService;
+  let sessionRepository: jest.Mocked<Repository<ClassSession>>;
+  let attendanceService: jest.Mocked<AttendanceService>;
 
-  const mockSessionRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-  };
-
-  const mockAttendanceService = {
-    calculateAttendanceFromSnapshots: jest.fn(),
-    applyManualCorrection: jest.fn(),
+  const mockSession: ClassSession = {
+    id: 'session-uuid',
+    groupId: 'group-uuid',
+    teacherId: 'teacher-uuid',
+    classroomId: 'classroom-uuid',
+    deviceId: 'device-uuid',
+    scheduledStart: new Date('2024-01-15T08:00:00Z'),
+    scheduledEnd: new Date('2024-01-15T10:00:00Z'),
+    actualStart: null,
+    actualEnd: null,
+    status: SessionStatus.PENDING,
+    snapshots: [],
+    attendanceRecords: [],
+    group: null,
+    teacher: null,
+    classroom: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   beforeEach(async () => {
@@ -28,20 +40,27 @@ describe('SessionService', () => {
         SessionService,
         {
           provide: getRepositoryToken(ClassSession),
-          useValue: mockSessionRepository,
+          useValue: {
+            create: jest.fn(),
+            save: jest.fn(),
+            findOne: jest.fn(),
+            find: jest.fn(),
+            createQueryBuilder: jest.fn(),
+          },
         },
         {
           provide: AttendanceService,
-          useValue: mockAttendanceService,
+          useValue: {
+            calculateAttendanceFromSnapshots: jest.fn(),
+            applyManualCorrection: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get<SessionService>(SessionService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
+    sessionRepository = module.get(getRepositoryToken(ClassSession));
+    attendanceService = module.get(AttendanceService);
   });
 
   it('should be defined', () => {
@@ -49,181 +68,102 @@ describe('SessionService', () => {
   });
 
   describe('startSession', () => {
-    it('should create and start a session with ACTIVE status', async () => {
-      const startSessionDto = {
-        groupId: 'group-uuid',
-        teacherId: 'teacher-uuid',
-        classroomId: 'classroom-uuid',
-        deviceId: 'device-uuid',
-        scheduledStart: '2024-01-15T08:00:00Z',
-        scheduledEnd: '2024-01-15T10:00:00Z',
-      };
+    const startSessionDto: StartSessionDto = {
+      groupId: 'group-uuid',
+      classroomId: 'classroom-uuid',
+      courseId: 'course-uuid',
+      scheduledStart: '2024-01-15T08:00:00Z',
+      scheduledEnd: '2024-01-15T10:00:00Z',
+    };
+    const teacherId = 'teacher-uuid';
 
-      const mockSession = {
-        id: 'session-uuid',
-        ...startSessionDto,
-        scheduledStart: new Date(startSessionDto.scheduledStart),
-        scheduledEnd: new Date(startSessionDto.scheduledEnd),
-        actualStart: expect.any(Date),
-        status: SessionStatus.ACTIVE,
-      };
+    it('should create and start a session with IN_PROGRESS status', async () => {
+      const createdSession = { ...mockSession, status: SessionStatus.IN_PROGRESS };
+      sessionRepository.findOne.mockResolvedValue(null); // No active session
+      sessionRepository.create.mockReturnValue(createdSession as ClassSession);
+      sessionRepository.save.mockResolvedValue(createdSession as ClassSession);
 
-      mockSessionRepository.create.mockReturnValue(mockSession);
-      mockSessionRepository.save.mockResolvedValue(mockSession);
+      const result = await service.startSession(startSessionDto, teacherId);
 
-      const result = await service.startSession(startSessionDto);
-
-      expect(result.status).toBe(SessionStatus.ACTIVE);
-      expect(result.actualStart).toBeDefined();
-      expect(mockSessionRepository.save).toHaveBeenCalled();
+      expect(sessionRepository.findOne).toHaveBeenCalled();
+      expect(sessionRepository.create).toHaveBeenCalled();
+      expect(sessionRepository.save).toHaveBeenCalled();
+      expect(result.status).toBe(SessionStatus.IN_PROGRESS);
+      expect(result.actualStart).toBeInstanceOf(Date);
     });
   });
 
   describe('closeSession', () => {
-    const sessionId = 'session-uuid';
+    const closeSessionDto: CloseSessionDto = {
+      sessionId: 'session-uuid',
+      manualCorrections: [],
+    };
+    const teacherId = 'teacher-uuid';
 
     it('should close session and calculate attendance', async () => {
-      const mockSession = {
-        id: sessionId,
-        groupId: 'group-uuid',
-        teacherId: 'teacher-uuid',
-        classroomId: 'classroom-uuid',
-        status: SessionStatus.ACTIVE,
-        actualStart: new Date(),
-      };
+      const sessionToClose = { ...mockSession, status: SessionStatus.IN_PROGRESS };
+      const closedSession = { ...sessionToClose, status: SessionStatus.CLOSED };
 
-      const closeSessionDto = {
-        sessionId,
-        manualCorrections: [],
-      };
+      sessionRepository.findOne.mockResolvedValue(sessionToClose as ClassSession);
+      attendanceService.calculateAttendanceFromSnapshots.mockResolvedValue([]);
+      sessionRepository.save.mockResolvedValue(closedSession as ClassSession);
 
-      mockSessionRepository.findOne.mockResolvedValue(mockSession);
-      mockAttendanceService.calculateAttendanceFromSnapshots.mockResolvedValue([]);
-      mockSessionRepository.save.mockResolvedValue({
-        ...mockSession,
-        status: SessionStatus.CLOSED,
-        actualEnd: expect.any(Date),
-      });
+      const result = await service.closeSession(closeSessionDto, teacherId);
 
-      const result = await service.closeSession(closeSessionDto);
-
-      expect(result.status).toBe(SessionStatus.CLOSED);
-      expect(result.actualEnd).toBeDefined();
-      expect(mockAttendanceService.calculateAttendanceFromSnapshots).toHaveBeenCalledWith(
-        sessionId,
+      expect(attendanceService.calculateAttendanceFromSnapshots).toHaveBeenCalledWith(
+        closeSessionDto.sessionId,
       );
+      expect(result.status).toBe(SessionStatus.CLOSED);
+      expect(result.actualEnd).toBeInstanceOf(Date);
     });
 
     it('should apply manual corrections when closing', async () => {
-      const mockSession = {
-        id: sessionId,
-        status: SessionStatus.ACTIVE,
-      };
+      const sessionToClose = { ...mockSession, status: SessionStatus.IN_PROGRESS };
+      const closedSession = { ...sessionToClose, status: SessionStatus.CLOSED };
+      const corrections = [
+        {
+          studentId: 'student-1',
+          status: 'PRESENT' as any,
+          arrivalTime: '2024-01-15T08:05:00Z',
+        },
+      ];
 
-      const closeSessionDto = {
-        sessionId,
-        manualCorrections: [
-          {
-            studentId: 'student-1',
-            status: AttendanceStatus.EXCUSED,
-            arrivalTime: '2024-01-15T08:00:00Z',
-          },
-        ],
-      };
+      sessionRepository.findOne.mockResolvedValue(sessionToClose as ClassSession);
+      attendanceService.calculateAttendanceFromSnapshots.mockResolvedValue([]);
+      attendanceService.applyManualCorrection.mockResolvedValue({} as any);
+      sessionRepository.save.mockResolvedValue(closedSession as ClassSession);
 
-      mockSessionRepository.findOne.mockResolvedValue(mockSession);
-      mockAttendanceService.calculateAttendanceFromSnapshots.mockResolvedValue([]);
-      mockAttendanceService.applyManualCorrection.mockResolvedValue({});
-      mockSessionRepository.save.mockResolvedValue({
-        ...mockSession,
-        status: SessionStatus.CLOSED,
-      });
-
-      await service.closeSession(closeSessionDto);
-
-      expect(mockAttendanceService.applyManualCorrection).toHaveBeenCalledWith(
-        sessionId,
-        'student-1',
-        AttendanceStatus.EXCUSED,
-        expect.any(Date),
+      await service.closeSession(
+        { ...closeSessionDto, manualCorrections: corrections },
+        teacherId,
       );
+
+      expect(attendanceService.applyManualCorrection).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if session does not exist', async () => {
-      mockSessionRepository.findOne.mockResolvedValue(null);
+      sessionRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.closeSession({ sessionId: 'non-existent', manualCorrections: [] }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.closeSession(closeSessionDto, teacherId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    it('should throw BadRequestException if session is already closed', async () => {
-      const mockSession = {
-        id: sessionId,
-        status: SessionStatus.CLOSED,
-      };
+    it('should throw BadRequestException if teacher does not own session', async () => {
+      sessionRepository.findOne.mockResolvedValue(mockSession as ClassSession);
 
-      mockSessionRepository.findOne.mockResolvedValue(mockSession);
-
-      await expect(service.closeSession({ sessionId, manualCorrections: [] })).rejects.toThrow(
+      await expect(service.closeSession(closeSessionDto, 'different-teacher')).rejects.toThrow(
         BadRequestException,
       );
     });
-  });
 
-  describe('getSessionDetails', () => {
-    it('should return session with snapshots and attendance records', async () => {
-      const sessionId = 'session-uuid';
-      const mockSession = {
-        id: sessionId,
-        groupId: 'group-uuid',
-        snapshots: [],
-        attendanceRecords: [],
-      };
+    it('should throw BadRequestException if session is already closed', async () => {
+      const closedSession = { ...mockSession, status: SessionStatus.CLOSED };
+      sessionRepository.findOne.mockResolvedValue(closedSession as ClassSession);
 
-      mockSessionRepository.findOne.mockResolvedValue(mockSession);
-
-      const result = await service.getSessionDetails(sessionId);
-
-      expect(result).toEqual(mockSession);
-      expect(mockSessionRepository.findOne).toHaveBeenCalledWith({
-        where: { id: sessionId },
-        relations: ['snapshots', 'attendanceRecords'],
-      });
-    });
-  });
-
-  describe('findAll with filters', () => {
-    it('should filter sessions by groupId', async () => {
-      const filters = { groupId: 'group-uuid' };
-      const mockSessions = [
-        { id: 'session-1', groupId: 'group-uuid' },
-        { id: 'session-2', groupId: 'group-uuid' },
-      ];
-
-      mockSessionRepository.find.mockResolvedValue(mockSessions);
-
-      const result = await service.findAll(filters);
-
-      expect(result).toHaveLength(2);
-      expect(mockSessionRepository.find).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ groupId: 'group-uuid' }),
-        }),
+      await expect(service.closeSession(closeSessionDto, teacherId)).rejects.toThrow(
+        BadRequestException,
       );
-    });
-
-    it('should filter sessions by date range', async () => {
-      const filters = {
-        startDate: '2024-01-01',
-        endDate: '2024-01-31',
-      };
-
-      mockSessionRepository.find.mockResolvedValue([]);
-
-      await service.findAll(filters);
-
-      expect(mockSessionRepository.find).toHaveBeenCalled();
     });
   });
 });

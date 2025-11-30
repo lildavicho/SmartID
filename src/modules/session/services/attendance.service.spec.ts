@@ -69,7 +69,7 @@ describe('AttendanceService', () => {
       classroomId: 'classroom-uuid',
       scheduledStart,
       scheduledEnd,
-      status: SessionStatus.ACTIVE,
+      status: SessionStatus.IN_PROGRESS,
     };
 
     it('should calculate PRESENT status when permanence >= 80%', async () => {

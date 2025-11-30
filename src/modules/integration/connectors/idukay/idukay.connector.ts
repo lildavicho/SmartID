@@ -2,7 +2,7 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AxiosRequestConfig } from 'axios';
-import { SISConnector, SyncResult, SendResult } from '../../interfaces/sis-connector.interface';
+import { SISConnector, SyncResult, SendResult, ConnectorConfig, ConnectorCredentials } from '../../interfaces/sis-connector.interface';
 import { MappingService } from '../../services/mapping.service';
 import { IdukayConfig, IdukayCredentials } from './types';
 import {
@@ -42,29 +42,32 @@ export class IdukayConnector implements SISConnector {
   /**
    * Connect to Idukay API
    */
-  async connect(config: any, credentials: any): Promise<boolean> {
+  async connect(config: ConnectorConfig | IdukayConfig, credentials: ConnectorCredentials | IdukayCredentials): Promise<boolean> {
     this.logger.log('Connecting to Idukay API...');
 
     // Validate configuration
-    if (!config.apiUrl || !config.institutionCode) {
+    const idukayConfig = config as IdukayConfig;
+    const idukayCredentials = credentials as IdukayCredentials;
+
+    if (!idukayConfig.apiUrl || !idukayConfig.institutionCode) {
       throw new BadRequestException('Missing required config: apiUrl and institutionCode');
     }
 
-    if (!credentials.apiKey || !credentials.secret) {
+    if (!idukayCredentials.apiKey || !idukayCredentials.secret) {
       throw new BadRequestException('Missing required credentials: apiKey and secret');
     }
 
     this.config = {
-      apiUrl: config.apiUrl,
-      institutionCode: config.institutionCode,
-      timeout: config.timeout || this.DEFAULT_TIMEOUT,
-      retryAttempts: config.retryAttempts || this.DEFAULT_RETRY_ATTEMPTS,
-      retryDelay: config.retryDelay || this.DEFAULT_RETRY_DELAY,
+      apiUrl: idukayConfig.apiUrl,
+      institutionCode: idukayConfig.institutionCode,
+      timeout: (idukayConfig.timeout as number) || this.DEFAULT_TIMEOUT,
+      retryAttempts: (idukayConfig.retryAttempts as number) || this.DEFAULT_RETRY_ATTEMPTS,
+      retryDelay: (idukayConfig.retryDelay as number) || this.DEFAULT_RETRY_DELAY,
     };
 
     this.credentials = {
-      apiKey: credentials.apiKey,
-      secret: credentials.secret,
+      apiKey: idukayCredentials.apiKey,
+      secret: idukayCredentials.secret,
     };
 
     // Test authentication
@@ -439,7 +442,7 @@ export class IdukayConnector implements SISConnector {
   private async makeRequest<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     endpoint: string,
-    data?: any,
+    data?: Record<string, unknown> | unknown[] | IdukayAttendanceRequest,
   ): Promise<T> {
     const url = `${this.config.apiUrl}${endpoint}`;
 
@@ -486,11 +489,17 @@ export class IdukayConnector implements SISConnector {
   /**
    * Handle HTTP request errors
    */
-  private handleRequestError(error: any): never {
-    if (error.response) {
+  private handleRequestError(error: unknown): never {
+    const axiosError = error as {
+      response?: { status: number; data?: { error?: { message?: string } } };
+      request?: unknown;
+      message?: string;
+    };
+
+    if (axiosError.response) {
       // Server responded with error status
-      const status = error.response.status;
-      const data = error.response.data;
+      const status = axiosError.response.status;
+      const data = axiosError.response.data;
 
       this.logger.error(`Idukay API error (${status}):`, data);
 
@@ -505,14 +514,15 @@ export class IdukayConnector implements SISConnector {
       } else {
         throw new Error(data?.error?.message || 'Request failed');
       }
-    } else if (error.request) {
+    } else if (axiosError.request) {
       // Request made but no response received
-      this.logger.error('No response from Idukay API:', error.message);
+      this.logger.error('No response from Idukay API:', axiosError.message);
       throw new Error('No response from Idukay API. Check network connection.');
     } else {
       // Error setting up request
-      this.logger.error('Request setup error:', error.message);
-      throw new Error(`Request error: ${error.message}`);
+      const errorMessage = axiosError.message || 'Unknown error';
+      this.logger.error('Request setup error:', errorMessage);
+      throw new Error(`Request error: ${errorMessage}`);
     }
   }
 

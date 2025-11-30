@@ -16,7 +16,7 @@ export class MappingService {
     entityType: MappingEntityType,
     internalId: string,
     externalId: string,
-    metadata?: Record<string, any>,
+    metadata?: Record<string, unknown>,
   ): Promise<IntegrationMapping> {
     // Check if mapping already exists
     const existing = await this.mappingRepository.findOne({
@@ -68,7 +68,7 @@ export class MappingService {
     integrationId: string,
     entityType?: MappingEntityType,
   ): Promise<IntegrationMapping[]> {
-    const where: any = { integrationId };
+    const where: { integrationId: string; entityType?: MappingEntityType } = { integrationId };
 
     if (entityType) {
       where.entityType = entityType;

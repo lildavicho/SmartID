@@ -1,7 +1,7 @@
 import { IntegrationMapping } from '../entities/integration-mapping.entity';
 
 export interface SISConnector {
-  connect(config: any, credentials: any): Promise<boolean>;
+  connect(config: ConnectorConfig, credentials: ConnectorCredentials): Promise<boolean>;
   testConnection(): Promise<boolean>;
   syncStudents(institutionId: string): Promise<SyncResult>;
   syncCourses(institutionId: string): Promise<SyncResult>;
@@ -28,13 +28,18 @@ export interface ConnectorConfig {
   username?: string;
   password?: string;
   timeout?: number;
-  [key: string]: any;
+  institutionCode?: string;
+  importPath?: string;
+  s3Bucket?: string;
+  [key: string]: unknown;
 }
 
 export interface ConnectorCredentials {
   token?: string;
   apiKey?: string;
+  secret?: string;
   username?: string;
   password?: string;
-  [key: string]: any;
+  wsToken?: string;
+  [key: string]: unknown;
 }

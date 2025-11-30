@@ -46,50 +46,61 @@ export class AuthService {
    * Register a new user
    */
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
-    const user = await this.userService.create(registerDto);
-    const token = await this.generateJWT(user);
+    try {
+      const user = await this.userService.create(registerDto);
+      const token = await this.generateJWT(user);
 
-    return {
-      access_token: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: this.getUserRole(user),
-        roleId: user.roleId,
-      },
-    };
+      return {
+        access_token: token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: this.getUserRole(user),
+          roleId: user.roleId,
+        },
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
    * Login user
    */
   async login(loginDto: LoginDto): Promise<AuthResponse> {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+    try {
+      const user = await this.validateUser(loginDto.email, loginDto.password);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      if (!user) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+
+      // Check if user is active
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException('User account is not active');
+      }
+
+      const token = await this.generateJWT(user);
+
+      return {
+        access_token: token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: this.getUserRole(user),
+          roleId: user.roleId,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new UnauthorizedException('Login failed');
     }
-
-    // Check if user is active
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('User account is not active');
-    }
-
-    const token = await this.generateJWT(user);
-
-    return {
-      access_token: token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: this.getUserRole(user),
-        roleId: user.roleId,
-      },
-    };
   }
 
   /**

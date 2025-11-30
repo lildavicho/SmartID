@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { SISConnector, SyncResult, SendResult } from '../interfaces/sis-connector.interface';
 import { IntegrationMapping } from '../entities/integration-mapping.entity';
 
@@ -8,12 +9,13 @@ import { IntegrationMapping } from '../entities/integration-mapping.entity';
  * Replace with actual Moodle Web Services API calls.
  */
 export class MoodleConnector implements SISConnector {
-  private config: any;
-  private credentials: any;
+  private readonly logger = new Logger(MoodleConnector.name);
+  private config: Record<string, unknown>;
+  private credentials: Record<string, unknown>;
   private connected: boolean = false;
   private wsToken: string;
 
-  async connect(config: any, credentials: any): Promise<boolean> {
+  async connect(config: Record<string, unknown>, credentials: Record<string, unknown>): Promise<boolean> {
     this.config = config;
     this.credentials = credentials;
 
@@ -21,7 +23,7 @@ export class MoodleConnector implements SISConnector {
     // Example: Get web service token using credentials
     // POST to /login/token.php
 
-    this.wsToken = credentials.token || credentials.wsToken;
+    this.wsToken = (credentials.token || credentials.wsToken) as string;
     this.connected = true;
     return true;
   }
@@ -48,7 +50,7 @@ export class MoodleConnector implements SISConnector {
     const mappings: IntegrationMapping[] = [];
     const errors: string[] = [];
 
-    console.log(`Syncing students from Moodle for institution ${institutionId}`);
+    this.logger.log(`Syncing students from Moodle for institution ${institutionId}`);
 
     return {
       success: true,
@@ -69,7 +71,7 @@ export class MoodleConnector implements SISConnector {
     const mappings: IntegrationMapping[] = [];
     const errors: string[] = [];
 
-    console.log(`Syncing courses from Moodle for institution ${institutionId}`);
+    this.logger.log(`Syncing courses from Moodle for institution ${institutionId}`);
 
     return {
       success: true,
@@ -89,7 +91,7 @@ export class MoodleConnector implements SISConnector {
 
     const errors: string[] = [];
 
-    console.log(`Sending attendance to Moodle for session ${sessionId}`);
+    this.logger.log(`Sending attendance to Moodle for session ${sessionId}`);
 
     return {
       success: true,

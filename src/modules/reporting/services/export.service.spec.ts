@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExportService } from './export.service';
-import { DailyAttendanceReport } from '../types/report-data.type';
+import { DailyAttendanceReport } from '../types';
 
 describe('ExportService', () => {
   let service: ExportService;
@@ -50,7 +50,18 @@ describe('ExportService', () => {
     });
 
     it('should throw error for unknown report type', async () => {
-      await expect(service.exportToExcel({}, 'unknown')).rejects.toThrow(
+      const mockReport: DailyAttendanceReport = {
+        date: '2024-01-15',
+        institutionId: 'inst-1',
+        totalStudents: 0,
+        totalPresent: 0,
+        totalAbsent: 0,
+        totalLate: 0,
+        totalExcused: 0,
+        attendanceRate: 0,
+        groups: [],
+      };
+      await expect(service.exportToExcel(mockReport, 'unknown' as any)).rejects.toThrow(
         'Unknown report type: unknown',
       );
     });

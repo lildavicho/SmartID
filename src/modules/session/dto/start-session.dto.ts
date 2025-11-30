@@ -1,27 +1,26 @@
-import { IsUUID, IsNotEmpty, IsOptional, IsDateString } from 'class-validator';
+import { IsUUID, IsDateString, IsOptional } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class StartSessionDto {
+  @ApiProperty({ description: 'ID del aula donde se realiza la clase' })
   @IsUUID()
-  @IsNotEmpty()
-  groupId: string;
-
-  @IsUUID()
-  @IsNotEmpty()
-  teacherId: string;
-
-  @IsUUID()
-  @IsNotEmpty()
   classroomId: string;
 
+  @ApiProperty({ description: 'ID del curso' })
   @IsUUID()
+  courseId: string;
+
+  @ApiProperty({ description: 'ID del grupo/sección' })
+  @IsUUID()
+  groupId: string;
+
+  @ApiProperty({ description: 'Hora programada de inicio', required: false })
   @IsOptional()
-  deviceId?: string;
-
   @IsDateString()
-  @IsNotEmpty()
-  scheduledStart: string;
+  scheduledStart?: string;
 
+  @ApiProperty({ description: 'Hora programada de fin', required: false })
+  @IsOptional()
   @IsDateString()
-  @IsNotEmpty()
-  scheduledEnd: string;
+  scheduledEnd?: string;
 }

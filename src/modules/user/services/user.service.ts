@@ -108,7 +108,10 @@ export class UserService {
   }
 
   async updatePassword(id: string, newPassword: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id } });
+    const user = await this.userRepository.findOne({ 
+      where: { id },
+      relations: ['role'],
+    });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
@@ -123,7 +126,10 @@ export class UserService {
   }
 
   async assignRole(userId: string, roleId: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    const user = await this.userRepository.findOne({ 
+      where: { id: userId },
+      relations: ['role'],
+    });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);

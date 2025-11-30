@@ -78,7 +78,7 @@ export class TeachingAssignmentService {
   }
 
   async getGroupTeacher(groupId: string, academicTerm?: string): Promise<Teacher | null> {
-    const whereCondition: any = { groupId };
+    const whereCondition: { groupId: string; academicTerm?: string } = { groupId };
 
     if (academicTerm) {
       whereCondition.academicTerm = academicTerm;

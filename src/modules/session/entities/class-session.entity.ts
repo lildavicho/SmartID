@@ -5,10 +5,15 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { SessionStatus } from '../enums/session-status.enum';
 import { AttendanceSnapshot } from './attendance-snapshot.entity';
 import { AttendanceRecord } from './attendance-record.entity';
+import { Group } from '../../academic/entities/group.entity';
+import { Teacher } from '../../academic/entities/teacher.entity';
+import { Classroom } from '../../device/entities/classroom.entity';
 
 @Entity('class_sessions')
 export class ClassSession {
@@ -26,6 +31,19 @@ export class ClassSession {
 
   @Column({ type: 'uuid', nullable: true })
   deviceId: string;
+
+  // Relations
+  @ManyToOne(() => Group, { nullable: false })
+  @JoinColumn({ name: 'groupId' })
+  group: Group;
+
+  @ManyToOne(() => Teacher, { nullable: false })
+  @JoinColumn({ name: 'teacherId' })
+  teacher: Teacher;
+
+  @ManyToOne(() => Classroom, { nullable: false })
+  @JoinColumn({ name: 'classroomId' })
+  classroom: Classroom;
 
   @Column({ type: process.env.NODE_ENV === 'test' ? 'datetime' : 'timestamp' })
   scheduledStart: Date;
@@ -48,7 +66,7 @@ export class ClassSession {
   @Column({
     type: process.env.NODE_ENV === 'test' ? 'text' : 'enum',
     enum: SessionStatus,
-    default: SessionStatus.SCHEDULED,
+    default: SessionStatus.PENDING,
   })
   status: SessionStatus;
 

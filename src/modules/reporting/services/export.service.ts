@@ -10,7 +10,10 @@ export class ExportService {
   /**
    * Export data to Excel format
    */
-  async exportToExcel(data: any, reportType: string): Promise<Buffer> {
+  async exportToExcel(
+    data: DailyAttendanceReport | CourseReport | TeacherReport,
+    reportType: 'daily' | 'course' | 'teacher',
+  ): Promise<Buffer> {
     this.logger.log(`Exporting ${reportType} to Excel`);
 
     const workbook = new ExcelJS.Workbook();
@@ -38,7 +41,10 @@ export class ExportService {
   /**
    * Export data to PDF format
    */
-  async exportToPDF(data: any, reportType: string): Promise<Buffer> {
+  async exportToPDF(
+    data: DailyAttendanceReport | CourseReport | TeacherReport,
+    reportType: 'daily' | 'course' | 'teacher',
+  ): Promise<Buffer> {
     this.logger.log(`Exporting ${reportType} to PDF`);
 
     return new Promise((resolve, reject) => {

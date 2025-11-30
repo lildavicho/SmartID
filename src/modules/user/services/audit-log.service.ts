@@ -45,7 +45,7 @@ export class AuditLogService {
       entityType?: string;
       entityId?: string;
       description?: string;
-      metadata?: Record<string, any>;
+      metadata?: Record<string, unknown>;
       ipAddress?: string;
       userAgent?: string;
       institutionId?: string;

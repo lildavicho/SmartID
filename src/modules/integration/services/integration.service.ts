@@ -136,7 +136,7 @@ export class IntegrationService {
   }
 
   async findAll(institutionId?: string): Promise<Integration[]> {
-    const where: any = {};
+    const where: { institutionId?: string } = {};
 
     if (institutionId) {
       where.institutionId = institutionId;

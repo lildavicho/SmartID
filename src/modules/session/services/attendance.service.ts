@@ -23,14 +23,16 @@ export class AttendanceService {
   ) {}
 
   async calculateAttendanceFromSnapshots(sessionId: string): Promise<AttendanceRecord[]> {
-    // Get session details
-    const session = await this.sessionRepository.findOne({
-      where: { id: sessionId },
-    });
+    try {
+      // Get session details with relations to avoid N+1 queries
+      const session = await this.sessionRepository.findOne({
+        where: { id: sessionId },
+        relations: ['group', 'group.course'],
+      });
 
-    if (!session) {
-      throw new NotFoundException(`Session with ID ${sessionId} not found`);
-    }
+      if (!session) {
+        throw new NotFoundException(`Session with ID ${sessionId} not found`);
+      }
 
     // Get all snapshots for this session
     const snapshots = await this.snapshotRepository.find({
@@ -134,6 +136,12 @@ export class AttendanceService {
     }
 
     return attendanceRecords;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new Error(`Failed to calculate attendance: ${error.message}`);
+    }
   }
 
   async applyManualCorrection(
