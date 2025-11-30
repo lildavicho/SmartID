@@ -61,7 +61,8 @@ export class SessionController {
   @ApiOperation({ summary: 'Obtener sesión activa del profesor (para Android)' })
   @ApiResponse({ status: 200, description: 'Sesión activa encontrada' })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.TEACHER)
+  // Permite acceso a TEACHER y SUPER_ADMIN (superadmin puede ver sesiones activas)
+  @Roles(UserRole.TEACHER, UserRole.SUPER_ADMIN)
   async getActiveSession(@CurrentUser() user: CurrentUserData) {
     return this.sessionService.getActiveSessionForTeacher(user.userId);
   }

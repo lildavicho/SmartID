@@ -23,6 +23,16 @@ export class RolesGuard implements CanActivate {
       return false;
     }
 
-    return requiredRoles.some((role) => user.role === role);
+    // Normaliza roles para comparación (maneja diferencias entre "superadmin" y "SUPER_ADMIN")
+    const normalizeRole = (role: string): string => {
+      return role.toUpperCase().replace(/-/g, '_');
+    };
+
+    const userRoleNormalized = normalizeRole(user.role || '');
+    
+    return requiredRoles.some((role) => {
+      const requiredRoleNormalized = normalizeRole(role);
+      return userRoleNormalized === requiredRoleNormalized;
+    });
   }
 }
