@@ -1,0 +1,10 @@
+export { CreateCourseDto } from './create-course.dto';
+export { UpdateCourseDto } from './update-course.dto';
+export { CreateGroupDto } from './create-group.dto';
+export { UpdateGroupDto } from './update-group.dto';
+export { CreateStudentDto } from './create-student.dto';
+export { UpdateStudentDto } from './update-student.dto';
+export { CreateTeacherDto } from './create-teacher.dto';
+export { UpdateTeacherDto } from './update-teacher.dto';
+export { EnrollStudentDto } from './enroll-student.dto';
+export { AssignTeacherDto } from './assign-teacher.dto';

@@ -1,0 +1,3 @@
+# This directory contains TypeORM migrations
+# Run `npm run migration:generate` to create a new migration
+

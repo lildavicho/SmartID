@@ -1,0 +1,10 @@
+export { CreateDeviceDto } from './create-device.dto';
+export { UpdateDeviceDto } from './update-device.dto';
+export { DeviceHeartbeatDto } from './device-heartbeat.dto';
+export { BindDeviceToClassroomDto } from './bind-device-to-classroom.dto';
+export { UpdateDeviceStatusDto } from './update-device-status.dto';
+export { QueryDeviceDto } from './query-device.dto';
+export { CreateClassroomDto } from './create-classroom.dto';
+export { UpdateClassroomDto } from './update-classroom.dto';
+export { QueryClassroomDto } from './query-classroom.dto';
+export { CreateAttendanceLogDto } from './create-attendance-log.dto';
