@@ -8,6 +8,7 @@ import {
   Query,
   ValidationPipe,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { SessionService } from '../services/session.service';
@@ -31,6 +32,8 @@ import { CurrentUser, CurrentUserData } from '../../../common/decorators/current
 @UseGuards(JwtAuthGuard)
 @Controller('sessions')
 export class SessionController {
+  private readonly logger = new Logger(SessionController.name);
+
   constructor(
     private readonly sessionService: SessionService,
     private readonly snapshotService: SnapshotService,
@@ -59,12 +62,57 @@ export class SessionController {
 
   @Get('active')
   @ApiOperation({ summary: 'Obtener sesión activa del profesor (para Android)' })
-  @ApiResponse({ status: 200, description: 'Sesión activa encontrada' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Sesión activa encontrada o no hay sesión activa',
+    schema: {
+      example: {
+        hasActiveSession: true,
+        session: {
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          status: 'IN_PROGRESS',
+          groupId: '660e8400-e29b-41d4-a716-446655440001',
+          teacherId: '770e8400-e29b-41d4-a716-446655440002',
+        }
+      }
+    }
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'No hay sesión activa',
+    schema: {
+      example: {
+        hasActiveSession: false,
+        session: null
+      }
+    }
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   // Permite acceso a TEACHER y SUPER_ADMIN (superadmin puede ver sesiones activas)
   @Roles(UserRole.TEACHER, UserRole.SUPER_ADMIN)
   async getActiveSession(@CurrentUser() user: CurrentUserData) {
-    return this.sessionService.getActiveSessionForTeacher(user.userId);
+    // Log del usuario que accede al endpoint
+    this.logger.log(
+      `GET /sessions/active - Usuario: ${user.email} (ID: ${user.userId}, Rol: ${user.role})`,
+    );
+
+    const result = await this.sessionService.getActiveSessionForTeacher(user.userId);
+
+    if (result) {
+      this.logger.log(
+        `Sesión activa encontrada para usuario ${user.userId}: ${result.id}`,
+      );
+      return {
+        hasActiveSession: true,
+        session: result,
+      };
+    } else {
+      this.logger.log(`No hay sesión activa para usuario ${user.userId}`);
+      return {
+        hasActiveSession: false,
+        session: null,
+      };
+    }
   }
 
   @Post(':id/start')

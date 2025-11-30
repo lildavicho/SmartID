@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { ClassSession } from '../entities/class-session.entity';
@@ -12,6 +12,8 @@ import { SnapshotService } from './snapshot.service';
 
 @Injectable()
 export class SessionService {
+  private readonly logger = new Logger(SessionService.name);
+
   constructor(
     @InjectRepository(ClassSession)
     private readonly sessionRepository: Repository<ClassSession>,
@@ -200,13 +202,32 @@ export class SessionService {
 
   /**
    * Get active session for a specific teacher
+   * Retorna null si no hay sesión activa (no lanza excepción)
    */
   async getActiveSessionForTeacher(teacherId: string): Promise<ClassSession | null> {
-    return await this.sessionRepository.findOne({
-      where: { teacherId, status: SessionStatus.IN_PROGRESS },
-      relations: ['group', 'group.course', 'classroom'],
-      order: { actualStart: 'DESC' },
-    });
+    try {
+      const session = await this.sessionRepository.findOne({
+        where: { teacherId, status: SessionStatus.IN_PROGRESS },
+        relations: ['group', 'group.course', 'classroom'],
+        order: { actualStart: 'DESC' },
+      });
+
+      if (session) {
+        this.logger.log(
+          `Sesión activa encontrada para teacherId ${teacherId}: ${session.id}`,
+        );
+      } else {
+        this.logger.log(`No hay sesión activa para teacherId ${teacherId}`);
+      }
+
+      return session;
+    } catch (error) {
+      this.logger.error(
+        `Error al buscar sesión activa para teacherId ${teacherId}: ${error.message}`,
+      );
+      // Retorna null en lugar de lanzar excepción
+      return null;
+    }
   }
 
   /**
