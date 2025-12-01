@@ -1,8 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { ClassSession } from '../entities/class-session.entity';
+import { AttendanceRecord } from '../entities/attendance-record.entity';
+import { Enrollment } from '../../academic/entities/enrollment.entity';
 import { SessionStatus } from '../enums/session-status.enum';
+import { AttendanceStatus } from '../enums/attendance-status.enum';
+import { AttendanceOrigin } from '../enums/attendance-origin.enum';
+import { AttendanceSource } from '../enums/attendance-source.enum';
 import { StartSessionDto } from '../dto/start-session.dto';
 import { CloseSessionDto } from '../dto/close-session.dto';
 import { SessionFiltersDto } from '../dto/session-filters.dto';
@@ -17,6 +22,10 @@ export class SessionService {
   constructor(
     @InjectRepository(ClassSession)
     private readonly sessionRepository: Repository<ClassSession>,
+    @InjectRepository(AttendanceRecord)
+    private readonly attendanceRecordRepository: Repository<AttendanceRecord>,
+    @InjectRepository(Enrollment)
+    private readonly enrollmentRepository: Repository<Enrollment>,
     private readonly attendanceService: AttendanceService,
     private readonly snapshotService: SnapshotService,
   ) {}
@@ -161,6 +170,9 @@ export class SessionService {
         this.logger.warn(`Error al calcular asistencia para sesión ${sessionId}: ${error.message}`);
         // Continuar aunque falle el cálculo de asistencia
       }
+
+      // Marcar como ABSENT a estudiantes que no tienen registro de asistencia
+      await this.markAbsentStudents(sessionId, session.groupId);
 
       // Actualizar estado de la sesión
       session.status = SessionStatus.FINISHED;
@@ -367,5 +379,62 @@ export class SessionService {
       status: session.status,
       deviceId: session.deviceId,
     }));
+  }
+
+  /**
+   * Marca como ABSENT a los estudiantes que no tienen registro de asistencia
+   * Se ejecuta al cerrar la sesión
+   */
+  private async markAbsentStudents(sessionId: string, groupId: string): Promise<void> {
+    try {
+      // Obtener todos los estudiantes del grupo
+      const enrollments = await this.enrollmentRepository.find({
+        where: { groupId },
+      });
+
+      const studentIds = enrollments.map((e) => e.studentId);
+
+      if (studentIds.length === 0) {
+        this.logger.warn(`No hay estudiantes en el grupo ${groupId}`);
+        return;
+      }
+
+      // Obtener estudiantes que ya tienen registro de asistencia (PRESENT o LATE)
+      const existingRecords = await this.attendanceRecordRepository.find({
+        where: {
+          sessionId,
+          studentId: In(studentIds),
+          status: In([AttendanceStatus.PRESENT, AttendanceStatus.LATE]),
+        },
+      });
+
+      const presentStudentIds = new Set(existingRecords.map((r) => r.studentId));
+
+      // Crear registros de ABSENT para estudiantes sin registro
+      const absentStudentIds = studentIds.filter((id) => !presentStudentIds.has(id));
+
+      if (absentStudentIds.length > 0) {
+        const absentRecords = absentStudentIds.map((studentId) =>
+          this.attendanceRecordRepository.create({
+            sessionId,
+            studentId,
+            status: AttendanceStatus.ABSENT,
+            origin: AttendanceOrigin.AI,
+            source: AttendanceSource.CAMERA_YOLO,
+            confidence: null,
+          }),
+        );
+
+        await this.attendanceRecordRepository.save(absentRecords);
+        this.logger.log(
+          `Marcados ${absentRecords.length} estudiantes como ABSENT para sesión ${sessionId}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error al marcar estudiantes ausentes para sesión ${sessionId}: ${error.message}`,
+      );
+      // No lanzar error para no interrumpir el cierre de sesión
+    }
   }
 }

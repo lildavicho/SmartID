@@ -12,6 +12,7 @@ import { AcademicModule } from './modules/academic/academic.module';
 import { SessionModule } from './modules/session/session.module';
 import { IntegrationModule } from './modules/integration/integration.module';
 import { ReportingModule } from './modules/reporting/reporting.module';
+import { VisionModule } from './modules/vision/vision.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ReportingModule } from './modules/reporting/reporting.module';
     SessionModule,
     IntegrationModule,
     ReportingModule,
+    VisionModule,
   ],
 })
 export class AppModule {}
