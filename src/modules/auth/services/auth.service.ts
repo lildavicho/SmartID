@@ -11,6 +11,7 @@ export interface JwtPayload {
   email: string;
   role: string;
   roleId?: string;
+  schoolId?: string; // institutionId del usuario (opcional)
 }
 
 export interface AuthResponse {
@@ -124,6 +125,7 @@ export class AuthService {
 
   /**
    * Generate JWT token
+   * Incluye: sub (userId), email, role, roleId, y opcionalmente schoolId (institutionId)
    */
   async generateJWT(user: User): Promise<string> {
     const payload: JwtPayload = {
@@ -131,6 +133,7 @@ export class AuthService {
       email: user.email,
       role: this.getUserRole(user),
       roleId: user.roleId,
+      schoolId: user.institutionId || undefined, // Opcional: solo si el usuario tiene institutionId
     };
 
     return this.jwtService.sign(payload);

@@ -19,6 +19,9 @@ export class Institution {
   @Column({ length: 100, unique: true })
   code: string;
 
+  @Column({ length: 255, nullable: true })
+  externalId: string; // ID externo (ej. idukay_school_id)
+
   @Column({ length: 100 })
   country: string;
 

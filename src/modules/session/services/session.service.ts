@@ -21,37 +21,71 @@ export class SessionService {
     private readonly snapshotService: SnapshotService,
   ) {}
 
-  async startSession(startSessionDto: StartSessionDto, teacherId: string): Promise<ClassSession> {
+  /**
+   * Abre una nueva sesión para un profesor
+   * REGLA: Un profesor no puede tener más de una sesión IN_PROGRESS a la vez
+   * 
+   * @param startSessionDto Datos de la sesión
+   * @param teacherId ID del profesor
+   * @param deviceId ID del dispositivo (opcional)
+   * @returns Sesión creada
+   */
+  async openSessionForTeacher(
+    startSessionDto: StartSessionDto,
+    teacherId: string,
+    deviceId?: string,
+  ): Promise<ClassSession> {
     try {
       const { groupId, classroomId, scheduledStart, scheduledEnd } = startSessionDto;
 
-      // Check if teacher already has an active session
+      // Verificar si el profesor ya tiene una sesión activa
       const activeSession = await this.sessionRepository.findOne({
         where: { teacherId, status: SessionStatus.IN_PROGRESS },
       });
 
       if (activeSession) {
-        throw new BadRequestException('Ya tienes una sesión activa');
+        this.logger.warn(
+          `Intento de abrir sesión cuando ya existe una activa. TeacherId: ${teacherId}, Sesión activa: ${activeSession.id}`,
+        );
+        throw new BadRequestException('Ya tienes una sesión activa. Debes cerrarla antes de abrir una nueva.');
       }
 
-      // Create session with IN_PROGRESS status
+      // Crear sesión con status IN_PROGRESS
+      const now = new Date();
       const session = this.sessionRepository.create({
         groupId,
         teacherId,
         classroomId,
-        scheduledStart: scheduledStart ? new Date(scheduledStart) : new Date(),
-        scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : new Date(Date.now() + 2 * 60 * 60 * 1000), // Default 2 hours
-        actualStart: new Date(), // Set to current time
+        deviceId: deviceId || null,
+        scheduledStart: scheduledStart ? new Date(scheduledStart) : now,
+        scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : new Date(now.getTime() + 2 * 60 * 60 * 1000), // Default 2 horas
+        actualStart: now,
         status: SessionStatus.IN_PROGRESS,
+        createdBy: teacherId,
+        updatedBy: teacherId,
       });
 
-      return await this.sessionRepository.save(session);
+      const savedSession = await this.sessionRepository.save(session);
+
+      this.logger.log(
+        `Sesión abierta exitosamente. SessionId: ${savedSession.id}, TeacherId: ${teacherId}, GroupId: ${groupId}`,
+      );
+
+      return savedSession;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw error;
+      this.logger.error(`Error al abrir sesión para teacherId ${teacherId}: ${error.message}`);
+      throw new BadRequestException('Error al abrir sesión');
     }
+  }
+
+  /**
+   * Alias para compatibilidad con código existente
+   */
+  async startSession(startSessionDto: StartSessionDto, teacherId: string): Promise<ClassSession> {
+    return this.openSessionForTeacher(startSessionDto, teacherId);
   }
 
   async startExistingSession(sessionId: string, teacherId: string): Promise<ClassSession> {
@@ -80,56 +114,97 @@ export class SessionService {
     return await this.sessionRepository.save(session);
   }
 
-  async closeSession(
-    closeSessionDto: CloseSessionDto,
+  /**
+   * Finaliza una sesión de clase
+   * 
+   * @param sessionId ID de la sesión
+   * @param finishedBy ID del usuario que finaliza la sesión (opcional, por defecto el profesor)
+   * @param teacherId ID del profesor (para validación de autorización)
+   * @returns Sesión finalizada
+   */
+  async finishSession(
+    sessionId: string,
     teacherId: string,
+    finishedBy?: string,
   ): Promise<ClassSession> {
     try {
-      const { sessionId, manualCorrections } = closeSessionDto;
-
       const session = await this.sessionRepository.findOne({
         where: { id: sessionId },
+        relations: ['group', 'teacher'],
       });
 
       if (!session) {
-        throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        throw new NotFoundException(`Sesión con ID ${sessionId} no encontrada`);
       }
 
-      // Validate teacher ownership
+      // Validar que el profesor es el dueño de la sesión
       if (session.teacherId !== teacherId) {
-        throw new BadRequestException('You are not authorized to close this session');
+        this.logger.warn(
+          `Intento de finalizar sesión no autorizado. SessionId: ${sessionId}, TeacherId solicitante: ${teacherId}, TeacherId dueño: ${session.teacherId}`,
+        );
+        throw new BadRequestException('No estás autorizado para finalizar esta sesión');
       }
 
-      if (session.status === SessionStatus.CLOSED) {
-        throw new BadRequestException('Session is already closed');
+      // Validar estado de la sesión
+      if (session.status === SessionStatus.FINISHED || session.status === SessionStatus.CLOSED) {
+        throw new BadRequestException(`La sesión ya está finalizada (status: ${session.status})`);
       }
 
-      // Calculate attendance from snapshots before closing
-      await this.attendanceService.calculateAttendanceFromSnapshots(sessionId);
-
-      // Apply manual corrections if provided
-      if (manualCorrections && manualCorrections.length > 0) {
-        for (const correction of manualCorrections) {
-          await this.attendanceService.applyManualCorrection(
-            sessionId,
-            correction.studentId,
-            correction.status,
-            correction.arrivalTime ? new Date(correction.arrivalTime) : undefined,
-          );
-        }
+      if (session.status === SessionStatus.CANCELLED) {
+        throw new BadRequestException('No se puede finalizar una sesión cancelada');
       }
 
-      // Update session status
-      session.status = SessionStatus.CLOSED;
+      // Calcular asistencia desde snapshots antes de cerrar
+      try {
+        await this.attendanceService.calculateAttendanceFromSnapshots(sessionId);
+      } catch (error) {
+        this.logger.warn(`Error al calcular asistencia para sesión ${sessionId}: ${error.message}`);
+        // Continuar aunque falle el cálculo de asistencia
+      }
+
+      // Actualizar estado de la sesión
+      session.status = SessionStatus.FINISHED;
       session.actualEnd = new Date();
+      session.updatedBy = finishedBy || teacherId;
 
-      return await this.sessionRepository.save(session);
+      const savedSession = await this.sessionRepository.save(session);
+
+      this.logger.log(
+        `Sesión finalizada exitosamente. SessionId: ${savedSession.id}, TeacherId: ${teacherId}, GroupId: ${session.groupId}`,
+      );
+
+      return savedSession;
     } catch (error) {
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException('Failed to close session');
+      this.logger.error(`Error al finalizar sesión ${sessionId}: ${error.message}`);
+      throw new BadRequestException('Error al finalizar sesión');
     }
+  }
+
+  /**
+   * Alias para compatibilidad con código existente
+   */
+  async closeSession(
+    closeSessionDto: CloseSessionDto,
+    teacherId: string,
+  ): Promise<ClassSession> {
+    const { sessionId, manualCorrections } = closeSessionDto;
+
+    // Aplicar correcciones manuales si se proporcionan
+    if (manualCorrections && manualCorrections.length > 0) {
+      for (const correction of manualCorrections) {
+        await this.attendanceService.applyManualCorrection(
+          sessionId,
+          correction.studentId,
+          correction.status,
+          correction.arrivalTime ? new Date(correction.arrivalTime) : undefined,
+        );
+      }
+    }
+
+    return this.finishSession(sessionId, teacherId);
   }
 
   async getSessionDetails(sessionId: string): Promise<ClassSession> {

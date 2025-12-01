@@ -6,12 +6,15 @@ import {
   UpdateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { ClassSession } from './class-session.entity';
 import { AttendanceStatus } from '../enums/attendance-status.enum';
 import { AttendanceOrigin } from '../enums/attendance-origin.enum';
+import { AttendanceSource } from '../enums/attendance-source.enum';
 
 @Entity('attendance_records')
+@Index(['sessionId', 'studentId']) // Índice compuesto para búsquedas rápidas
 export class AttendanceRecord {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -48,6 +51,26 @@ export class AttendanceRecord {
     default: AttendanceOrigin.AI,
   })
   origin: AttendanceOrigin;
+
+  /**
+   * Fuente del registro de asistencia
+   * - NFC: Registro mediante tarjeta NFC
+   * - CAMERA_YOLO: Detección automática mediante cámara y modelo YOLO/RKNN
+   * - MANUAL: Registro manual por el profesor
+   */
+  @Column({
+    type: process.env.NODE_ENV === 'test' ? 'text' : 'enum',
+    enum: AttendanceSource,
+    default: AttendanceSource.MANUAL,
+  })
+  source: AttendanceSource;
+
+  /**
+   * Nivel de confianza para detecciones de cámara (0-1)
+   * Solo aplicable cuando source = CAMERA_YOLO
+   */
+  @Column({ type: 'decimal', precision: 5, scale: 4, nullable: true })
+  confidence: number | null;
 
   @Column({ type: 'boolean', default: false })
   manualCorrection: boolean;

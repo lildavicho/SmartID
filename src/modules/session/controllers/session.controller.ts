@@ -88,26 +88,46 @@ export class SessionController {
     }
   })
   @UseGuards(JwtAuthGuard, RolesGuard)
-  // Permite acceso a TEACHER y SUPER_ADMIN (superadmin puede ver sesiones activas)
-  @Roles(UserRole.TEACHER, UserRole.SUPER_ADMIN)
-  async getActiveSession(@CurrentUser() user: CurrentUserData) {
+  // Permite acceso a TEACHER, SCHOOL_ADMIN y SUPER_ADMIN
+  @Roles(UserRole.TEACHER, UserRole.SCHOOL_ADMIN, UserRole.SUPER_ADMIN)
+  async getActiveSession(
+    @CurrentUser() user: CurrentUserData,
+    @Query('teacherId') teacherIdParam?: string,
+  ) {
     // Log del usuario que accede al endpoint
     this.logger.log(
-      `GET /sessions/active - Usuario: ${user.email} (ID: ${user.userId}, Rol: ${user.role})`,
+      `GET /sessions/active - Usuario: ${user.email} (ID: ${user.userId}, Rol: ${user.role}, SchoolId: ${user.schoolId || 'N/A'})`,
     );
 
-    const result = await this.sessionService.getActiveSessionForTeacher(user.userId);
+    // Determinar el teacherId a usar:
+    // - Si es TEACHER: usar su propio userId (asumiendo que User.id = Teacher.id o buscar por email)
+    // - Si es SUPER_ADMIN o SCHOOL_ADMIN: puede pasar teacherId como query param, o usar su userId por defecto
+    let teacherIdToUse: string;
+
+    if (user.role === 'TEACHER' || user.role === 'teacher') {
+      // Para TEACHER, usar su userId (asumiendo que coincide con teacherId o se busca por email)
+      teacherIdToUse = user.userId;
+    } else if (teacherIdParam) {
+      // SUPER_ADMIN o SCHOOL_ADMIN pueden especificar un teacherId
+      teacherIdToUse = teacherIdParam;
+      this.logger.log(`SUPER_ADMIN/SCHOOL_ADMIN consultando sesión de teacherId: ${teacherIdToUse}`);
+    } else {
+      // Por defecto, usar su propio userId
+      teacherIdToUse = user.userId;
+    }
+
+    const result = await this.sessionService.getActiveSessionForTeacher(teacherIdToUse);
 
     if (result) {
       this.logger.log(
-        `Sesión activa encontrada para usuario ${user.userId}: ${result.id}`,
+        `Sesión activa encontrada para teacherId ${teacherIdToUse}: ${result.id}`,
       );
       return {
         hasActiveSession: true,
         session: result,
       };
     } else {
-      this.logger.log(`No hay sesión activa para usuario ${user.userId}`);
+      this.logger.log(`No hay sesión activa para teacherId ${teacherIdToUse}`);
       return {
         hasActiveSession: false,
         session: null,

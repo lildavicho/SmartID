@@ -1,6 +1,7 @@
 export enum SessionStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
+  FINISHED = 'FINISHED',
   CLOSED = 'CLOSED',
   CANCELLED = 'CANCELLED',
 }

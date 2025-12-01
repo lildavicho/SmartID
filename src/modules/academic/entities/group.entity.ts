@@ -11,6 +11,7 @@ import {
 import { Course } from './course.entity';
 import { Enrollment } from './enrollment.entity';
 import { TeachingAssignment } from './teaching-assignment.entity';
+import { ExternalClassMapping } from '../../integration/entities/external-class-mapping.entity';
 
 @Entity('groups')
 export class Group {
@@ -38,6 +39,9 @@ export class Group {
 
   @OneToMany(() => TeachingAssignment, (assignment) => assignment.group)
   teachingAssignments: TeachingAssignment[];
+
+  @OneToMany(() => ExternalClassMapping, (mapping) => mapping.class)
+  externalMappings: ExternalClassMapping[];
 
   @CreateDateColumn()
   createdAt: Date;

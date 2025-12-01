@@ -28,10 +28,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // Return user data that will be attached to request.user
+    // Incluye schoolId (institutionId) para contexto multi-tenant
     return {
       userId: payload.sub,
       email: payload.email,
       role: payload.role,
+      schoolId: payload.schoolId || user.institutionId || undefined,
     };
   }
 }

@@ -15,6 +15,7 @@ describe('InstitutionService', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     name: 'Universidad Nacional',
     code: 'INST001',
+    externalId: null,
     country: 'Colombia',
     timezone: 'America/Bogota',
     config: { academicYear: 2024 },

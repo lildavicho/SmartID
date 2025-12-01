@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { TeachingAssignment } from './teaching-assignment.entity';
+import { ExternalTeacherAccount } from '../../integration/entities/external-teacher-account.entity';
 
 @Entity('teachers')
 export class Teacher {
@@ -33,6 +34,9 @@ export class Teacher {
 
   @OneToMany(() => TeachingAssignment, (assignment) => assignment.teacher)
   teachingAssignments: TeachingAssignment[];
+
+  @OneToMany(() => ExternalTeacherAccount, (account) => account.teacher)
+  externalAccounts: ExternalTeacherAccount[];
 
   @CreateDateColumn()
   createdAt: Date;
