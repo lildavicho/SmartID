@@ -32,6 +32,24 @@ export class Teacher {
   @Column({ length: 255, nullable: true })
   external_id: string;
 
+  /**
+   * PIN hash para Quick Login (bcrypt)
+   */
+  @Column({ name: 'pinHash', type: 'varchar', length: 255, nullable: true })
+  pinHash?: string | null;
+
+  /**
+   * Intentos fallidos de PIN
+   */
+  @Column({ name: 'pinFailedAttempts', type: 'int', default: 0 })
+  pinFailedAttempts: number;
+
+  /**
+   * Fecha hasta la cual la cuenta está bloqueada por intentos fallidos
+   */
+  @Column({ name: 'pinLockedUntil', type: 'timestamptz', nullable: true })
+  pinLockedUntil?: Date | null;
+
   @OneToMany(() => TeachingAssignment, (assignment) => assignment.teacher)
   teachingAssignments: TeachingAssignment[];
 

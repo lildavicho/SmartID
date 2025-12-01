@@ -3,6 +3,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nes
 import { AuthService } from '../services/auth.service';
 import { RegisterDto } from '../../user/dto/register.dto';
 import { LoginDto } from '../../user/dto/login.dto';
+import { QuickLoginDto } from '../dto/quick-login.dto';
+import { QuickLoginResponseDto } from '../dto/quick-login-response.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { CurrentUser, CurrentUserData } from '../../../common/decorators/current-user.decorator';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -63,6 +65,25 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid credentials' })
   async login(@Body(ValidationPipe) loginDto: LoginDto) {
     return await this.authService.login(loginDto);
+  }
+
+  @Public()
+  @Post('quick-login')
+  @ApiOperation({
+    summary: 'Quick login by employeeCode + PIN',
+    description: 'Authenticate teacher using employee code and PIN. Returns JWT tokens and teacher information.',
+  })
+  @ApiBody({ type: QuickLoginDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Quick login successful',
+    type: QuickLoginResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid PIN' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Account locked due to failed PIN attempts' })
+  @ApiResponse({ status: 404, description: 'Not Found - Teacher with employeeCode not found' })
+  async quickLogin(@Body(ValidationPipe) dto: QuickLoginDto): Promise<QuickLoginResponseDto> {
+    return await this.authService.quickLogin(dto);
   }
 
   @UseGuards(JwtAuthGuard)
